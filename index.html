@@ -2,53 +2,97 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1f6f5c">
+<!-- resizes-content keeps the bottom bar above the keyboard -->
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<meta name="theme-color" content="#14171a">
 <title>New Note</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    --bg: #14171a; --surface: #1d2125; --text: #e8eaed; --muted: #8b9198;
+    --line: #2c3238; --green: #2f8f74; --blue: #3a6fb0;
+    --tint: #2b3743; --tint-text: #cdd7e1;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f2ee; --surface: #fbfaf8; --text: #1d1f21; --muted: #6b7076; --line: #dcd8d2; --tint: #c3d1e0; --tint-text: #1c2b3a; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
-    font-family: system-ui, sans-serif; padding: 16px; box-sizing: border-box;
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, sans-serif;
+    display: flex; flex-direction: column;
   }
-  .wrap { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 12px; }
-  .buttons { display: flex; gap: 10px; }
-  button {
-    flex: 1; font-size: 18px; font-weight: 600; padding: 16px 10px;
-    border: 0; border-radius: 14px; color: #fff; background: #1f6f5c;
+  header {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+    padding: 14px 18px 6px; color: var(--muted); font-size: 14px;
   }
-  button.alt { background: #2d5f9a; }
-  button.clear { flex: 0 0 auto; background: transparent; color: inherit; border: 1px solid #8888; font-weight: 400; }
-  button:active { opacity: .8; }
-  input, textarea {
-    width: 100%; font-size: 18px; padding: 12px; border-radius: 12px;
-    border: 1px solid #8888; box-sizing: border-box;
-    background: transparent; color: inherit; font-family: inherit;
+  header .right { justify-self: end; }
+  main {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+    margin: 4px 14px 0; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
   }
-  textarea { min-height: 35vh; resize: vertical; }
-  #msg { font-size: 14px; min-height: 1em; }
-  #url { font-family: ui-monospace, monospace; font-size: 12px; opacity: .55; word-break: break-all; }
+  textarea {
+    flex: 1; min-height: 0; width: 100%; resize: none; border: 0; outline: none;
+    background: transparent; color: var(--text);
+    font: 19px/1.45 system-ui, sans-serif; padding: 18px;
+  }
+  textarea::placeholder, input::placeholder { color: var(--muted); }
+  .meta { border-top: 1px solid var(--line); }
+  .meta input {
+    display: block; width: 100%; border: 0; outline: none; background: transparent;
+    color: var(--text); font-size: 16px; padding: 13px 18px;
+  }
+  .meta input + input { border-top: 1px solid var(--line); }
+  #status {
+    min-height: 22px; padding: 6px 20px 0; font-size: 13px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  footer {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  footer .row { display: flex; gap: 10px; width: 100%; }
+  footer .row button {
+    flex: 1; border: 0; border-radius: 14px; padding: 17px 8px;
+    font-size: 17px; font-weight: 600; color: #fff;
+  }
+  #pinboard { background: var(--blue); }
+  #pinkt { background: var(--green); }
+  button:active { filter: brightness(.88); }
+  button.small {
+    border: 0; border-radius: 12px; padding: 10px 18px;
+    background: var(--tint); color: var(--tint-text);
+    font-size: 15px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <!-- Buttons sit at the top so Android's clipboard pop-up (bottom of screen) can't cover them. -->
-  <div class="buttons">
-    <button id="pinboard" class="alt">Pinboard</button>
-    <button id="pinkt">Pinkt</button>
-    <button id="clear" class="clear" title="Clear">✕</button>
-  </div>
-  <div class="buttons">
-    <button id="inbox" class="clear">Open tempInbox on Pinboard</button>
-  </div>
-  <div id="msg"></div>
-  <textarea id="note" placeholder="Note…" autofocus></textarea>
-  <input id="title" placeholder="Title (optional)" autocomplete="off">
-  <input id="tags" placeholder="More tags (Pinboard adds tempInbox)" autocomplete="off" autocapitalize="none">
-  <div id="url"></div>
-</div>
+  <header>
+    <span>New note</span>
+    <button id="inbox" class="small">View temp inbox</button>
+    <span class="right"><button id="clear" class="small">Clear</button></span>
+  </header>
+
+  <main>
+    <textarea id="note" placeholder="What's on your mind?" autofocus></textarea>
+    <div class="meta">
+      <input id="title" placeholder="Title (optional)" autocomplete="off">
+      <input id="tags" placeholder="Tags" value="tempInbox" autocomplete="off" autocapitalize="none">
+    </div>
+  </main>
+
+  <div id="status"></div>
+
+  <footer>
+    <div class="row">
+      <button id="pinboard">Pinboard</button>
+      <button id="pinkt">Pinkt</button>
+    </div>
+  </footer>
+
 <script>
   const BASE = 'https://example.com/n/';
   const INBOX_TAG = 'tempInbox';
@@ -56,7 +100,7 @@
   const DRAFT_KEY = 'new-note-draft';
   const p = n => String(n).padStart(2, '0');
   const $ = id => document.getElementById(id);
-  const noteEl = $('note'), titleEl = $('title'), tagsEl = $('tags'), msg = $('msg'), urlEl = $('url');
+  const noteEl = $('note'), titleEl = $('title'), tagsEl = $('tags'), status = $('status');
 
   function makeUrl() {
     const d = new Date();
@@ -66,69 +110,57 @@
   function fields() {
     return { note: noteEl.value.trim(), title: titleEl.value.trim(), tags: tagsEl.value.trim() };
   }
+  function say(text) { status.textContent = text; }
 
   // Unsent draft survives the page closing.
   function saveDraft() {
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ n: noteEl.value, t: titleEl.value, g: tagsEl.value })); } catch {}
   }
   function clearAll() {
-    noteEl.value = ''; titleEl.value = ''; tagsEl.value = ''; urlEl.textContent = '';
+    noteEl.value = ''; titleEl.value = ''; tagsEl.value = INBOX_TAG;
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
   }
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    if (d) { noteEl.value = d.n || ''; titleEl.value = d.t || ''; tagsEl.value = d.g || ''; }
+    if (d) { noteEl.value = d.n || ''; titleEl.value = d.t || ''; tagsEl.value = d.g ?? INBOX_TAG; }
   } catch {}
   [noteEl, titleEl, tagsEl].forEach(el => el.addEventListener('input', saveDraft));
   noteEl.focus();
 
-  // Pinboard: opens Pinboard's own save form with everything filled in.
-  // Needs a connection and being logged in to pinboard.in in your browser.
+  // Pinboard: opens Pinboard's save form, filled in. Needs a connection and a pinboard.in login.
   $('pinboard').addEventListener('click', () => {
     const { note, title, tags } = fields();
-    const url = makeUrl();
-    urlEl.textContent = url;
-    // Always include the inbox tag (once), plus whatever was typed.
-    const tagList = [INBOX_TAG, ...tags.split(/\s+/).filter(Boolean)]
+    const tagList = tags.split(/\s+/).filter(Boolean)
       .filter((t, i, a) => a.findIndex(x => x.toLowerCase() === t.toLowerCase()) === i);
     const q = new URLSearchParams({
-      url,
+      url: makeUrl(),
       title: title || note.split('\n')[0].slice(0, 80) || 'Note',
       description: note,
       tags: tagList.join(' '),
       jump: 'close'
     });
     const w = window.open('https://pinboard.in/add?' + q.toString(), '_blank');
-    msg.textContent = w ? 'Opened Pinboard. Check it saved, then tap ✕ to clear.'
-                        : 'Pop-up blocked. Allow pop-ups for this site and try again.';
+    say(w ? 'Opened Pinboard — tap Clear once it’s saved.' : 'Pop-up blocked — allow pop-ups for this site.');
   });
 
   // Pinkt: Android share menu. Works offline; Pinkt syncs later.
   $('pinkt').addEventListener('click', async () => {
     const { note, title } = fields();
     const url = makeUrl();
-    urlEl.textContent = url;
-    msg.textContent = '';
-    if (!navigator.share) {
-      try { await navigator.clipboard.writeText(url); msg.textContent = 'Sharing not available. URL copied for Pinkt.'; }
-      catch { msg.textContent = 'Sharing not available. Copy the URL below into Pinkt.'; }
-      return;
-    }
+    if (!navigator.share) { say('Sharing not available here. URL: ' + url); return; }
     const data = { url };
     if (title) data.title = title;
     if (note) data.text = note;
-    const sharing = navigator.share(data);
-    if (note) navigator.clipboard?.writeText(note).catch(() => {});
     try {
-      await sharing;
+      await navigator.share(data);
       clearAll();
-      msg.textContent = note ? 'Sent. Note is also on your clipboard if Pinkt left it out.' : 'Sent.';
+      say('Sent to Pinkt.');
     } catch (e) {
-      if (e.name !== 'AbortError') msg.textContent = 'Share failed: ' + e.message;
+      if (e.name !== 'AbortError') say('Share failed: ' + e.message);
     }
   });
 
-  // Opens your Pinboard page filtered to the inbox tag. Asks for your username once.
+  // Opens your Pinboard page for the inbox tag. Asks for your username once.
   $('inbox').addEventListener('click', () => {
     let user = '';
     try { user = localStorage.getItem(USER_KEY) || ''; } catch {}
@@ -140,7 +172,7 @@
     window.open('https://pinboard.in/u:' + encodeURIComponent(user) + '/t:' + INBOX_TAG + '/', '_blank');
   });
 
-  $('clear').addEventListener('click', () => { clearAll(); msg.textContent = ''; noteEl.focus(); });
+  $('clear').addEventListener('click', () => { clearAll(); say(''); noteEl.focus(); });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

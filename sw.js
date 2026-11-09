@@ -1,5 +1,5 @@
 // Caches the page so the home-screen icon works with no signal.
-const CACHE = 'new-note-v4';
+const CACHE = 'new-note-v7';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
