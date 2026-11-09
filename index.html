@@ -40,14 +40,19 @@
     <button id="pinkt">Pinkt</button>
     <button id="clear" class="clear" title="Clear">✕</button>
   </div>
+  <div class="buttons">
+    <button id="inbox" class="clear">Open tempInbox on Pinboard</button>
+  </div>
   <div id="msg"></div>
   <textarea id="note" placeholder="Note…" autofocus></textarea>
   <input id="title" placeholder="Title (optional)" autocomplete="off">
-  <input id="tags" placeholder="Tags, space separated (Pinboard button)" autocomplete="off" autocapitalize="none">
+  <input id="tags" placeholder="More tags (Pinboard adds tempInbox)" autocomplete="off" autocapitalize="none">
   <div id="url"></div>
 </div>
 <script>
   const BASE = 'https://example.com/n/';
+  const INBOX_TAG = 'tempInbox';
+  const USER_KEY = 'pinboard-user';
   const DRAFT_KEY = 'new-note-draft';
   const p = n => String(n).padStart(2, '0');
   const $ = id => document.getElementById(id);
@@ -83,11 +88,14 @@
     const { note, title, tags } = fields();
     const url = makeUrl();
     urlEl.textContent = url;
+    // Always include the inbox tag (once), plus whatever was typed.
+    const tagList = [INBOX_TAG, ...tags.split(/\s+/).filter(Boolean)]
+      .filter((t, i, a) => a.findIndex(x => x.toLowerCase() === t.toLowerCase()) === i);
     const q = new URLSearchParams({
       url,
       title: title || note.split('\n')[0].slice(0, 80) || 'Note',
       description: note,
-      tags,
+      tags: tagList.join(' '),
       jump: 'close'
     });
     const w = window.open('https://pinboard.in/add?' + q.toString(), '_blank');
@@ -118,6 +126,18 @@
     } catch (e) {
       if (e.name !== 'AbortError') msg.textContent = 'Share failed: ' + e.message;
     }
+  });
+
+  // Opens your Pinboard page filtered to the inbox tag. Asks for your username once.
+  $('inbox').addEventListener('click', () => {
+    let user = '';
+    try { user = localStorage.getItem(USER_KEY) || ''; } catch {}
+    if (!user) {
+      user = (prompt('Your Pinboard username (asked once):') || '').trim();
+      if (!user) return;
+      try { localStorage.setItem(USER_KEY, user); } catch {}
+    }
+    window.open('https://pinboard.in/u:' + encodeURIComponent(user) + '/t:' + INBOX_TAG + '/', '_blank');
   });
 
   $('clear').addEventListener('click', () => { clearAll(); msg.textContent = ''; noteEl.focus(); });
