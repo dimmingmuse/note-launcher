@@ -11,62 +11,92 @@
   :root { color-scheme: light dark; }
   body {
     margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 18px;
-    font-family: system-ui, sans-serif; padding: 24px; box-sizing: border-box;
+    align-items: center; gap: 14px;
+    font-family: system-ui, sans-serif; padding: 20px; box-sizing: border-box;
   }
-  input {
-    width: 100%; max-width: 420px; font-size: 18px; padding: 14px;
+  input, textarea {
+    width: 100%; max-width: 480px; font-size: 18px; padding: 14px;
     border-radius: 12px; border: 1px solid #8888; box-sizing: border-box;
-    background: transparent; color: inherit;
+    background: transparent; color: inherit; font-family: inherit;
   }
+  textarea { min-height: 40vh; resize: vertical; }
   button {
-    width: 100%; max-width: 420px; font-size: 22px; font-weight: 600;
-    padding: 22px; border: 0; border-radius: 16px;
+    width: 100%; max-width: 480px; font-size: 22px; font-weight: 600;
+    padding: 20px; border: 0; border-radius: 16px;
     background: #1f6f5c; color: #fff;
   }
   button:active { opacity: .8; }
   #url { font-family: ui-monospace, monospace; font-size: 13px; opacity: .6; word-break: break-all; text-align: center; }
-  #msg { font-size: 14px; text-align: center; max-width: 420px; }
+  #msg { font-size: 14px; text-align: center; max-width: 480px; }
 </style>
 </head>
 <body>
+  <textarea id="note" placeholder="Note…" autofocus></textarea>
   <input id="title" placeholder="Title (optional)" autocomplete="off">
-  <button id="go">New note → Pinkt</button>
-  <div id="url"></div>
+  <button id="go">Send to Pinkt</button>
   <div id="msg"></div>
+  <div id="url"></div>
 <script>
   const BASE = 'https://example.com/n/';
+  const DRAFT_KEY = 'new-note-draft';
   const p = n => String(n).padStart(2, '0');
+  const noteEl = document.getElementById('note');
+  const titleEl = document.getElementById('title');
+  const urlEl = document.getElementById('url');
+  const msg = document.getElementById('msg');
+
   function makeUrl() {
     const d = new Date();
     return BASE + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
       '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
   }
-  const urlEl = document.getElementById('url');
-  const msg = document.getElementById('msg');
-  const titleEl = document.getElementById('title');
+
+  // Keep an unsent draft so a thought is never lost if the page closes.
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ n: noteEl.value, t: titleEl.value })); } catch {}
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+  }
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (d) { noteEl.value = d.n || ''; titleEl.value = d.t || ''; }
+  } catch {}
+  noteEl.addEventListener('input', saveDraft);
+  titleEl.addEventListener('input', saveDraft);
+  noteEl.focus();
 
   document.getElementById('go').addEventListener('click', async () => {
     const url = makeUrl();
+    const note = noteEl.value.trim();
+    const title = titleEl.value.trim();
     urlEl.textContent = url;
     msg.textContent = '';
-    const data = { url };
-    const t = titleEl.value.trim();
-    if (t) data.title = t;
-    if (navigator.share) {
-      try {
-        await navigator.share(data);
-        titleEl.value = '';
-      } catch (e) {
-        if (e.name !== 'AbortError') msg.textContent = 'Share failed: ' + e.message;
-      }
-    } else {
+
+    if (!navigator.share) {
       try {
         await navigator.clipboard.writeText(url);
         msg.textContent = 'Sharing not available here. URL copied — paste it in Pinkt.';
       } catch {
-        msg.textContent = 'Sharing not available here. Copy the URL above into Pinkt.';
+        msg.textContent = 'Sharing not available here. Copy the URL below into Pinkt.';
       }
+      return;
+    }
+
+    const data = { url };
+    if (title) data.title = title;
+    if (note) data.text = note;
+
+    // Share first (it needs the fresh tap), then copy the note as a backup.
+    const sharing = navigator.share(data);
+    if (note) navigator.clipboard?.writeText(note).catch(() => {});
+    try {
+      await sharing;
+      noteEl.value = ''; titleEl.value = ''; clearDraft();
+      msg.textContent = note ? 'Sent. Note is also on your clipboard if Pinkt left it out.' : 'Sent.';
+    } catch (e) {
+      if (e.name !== 'AbortError') msg.textContent = 'Share failed: ' + e.message;
+      // Draft is kept so nothing is lost.
     }
   });
 
