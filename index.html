@@ -10,95 +10,117 @@
 <style>
   :root { color-scheme: light dark; }
   body {
-    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; gap: 14px;
-    font-family: system-ui, sans-serif; padding: 20px; box-sizing: border-box;
+    margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
+    font-family: system-ui, sans-serif; padding: 16px; box-sizing: border-box;
   }
+  .wrap { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 12px; }
+  .buttons { display: flex; gap: 10px; }
+  button {
+    flex: 1; font-size: 18px; font-weight: 600; padding: 16px 10px;
+    border: 0; border-radius: 14px; color: #fff; background: #1f6f5c;
+  }
+  button.alt { background: #2d5f9a; }
+  button.clear { flex: 0 0 auto; background: transparent; color: inherit; border: 1px solid #8888; font-weight: 400; }
+  button:active { opacity: .8; }
   input, textarea {
-    width: 100%; max-width: 480px; font-size: 18px; padding: 14px;
-    border-radius: 12px; border: 1px solid #8888; box-sizing: border-box;
+    width: 100%; font-size: 18px; padding: 12px; border-radius: 12px;
+    border: 1px solid #8888; box-sizing: border-box;
     background: transparent; color: inherit; font-family: inherit;
   }
-  textarea { min-height: 40vh; resize: vertical; }
-  button {
-    width: 100%; max-width: 480px; font-size: 22px; font-weight: 600;
-    padding: 20px; border: 0; border-radius: 16px;
-    background: #1f6f5c; color: #fff;
-  }
-  button:active { opacity: .8; }
-  #url { font-family: ui-monospace, monospace; font-size: 13px; opacity: .6; word-break: break-all; text-align: center; }
-  #msg { font-size: 14px; text-align: center; max-width: 480px; }
+  textarea { min-height: 35vh; resize: vertical; }
+  #msg { font-size: 14px; min-height: 1em; }
+  #url { font-family: ui-monospace, monospace; font-size: 12px; opacity: .55; word-break: break-all; }
 </style>
 </head>
 <body>
+<div class="wrap">
+  <!-- Buttons sit at the top so Android's clipboard pop-up (bottom of screen) can't cover them. -->
+  <div class="buttons">
+    <button id="pinboard" class="alt">Pinboard</button>
+    <button id="pinkt">Pinkt</button>
+    <button id="clear" class="clear" title="Clear">✕</button>
+  </div>
+  <div id="msg"></div>
   <textarea id="note" placeholder="Note…" autofocus></textarea>
   <input id="title" placeholder="Title (optional)" autocomplete="off">
-  <button id="go">Send to Pinkt</button>
-  <div id="msg"></div>
+  <input id="tags" placeholder="Tags, space separated (Pinboard button)" autocomplete="off" autocapitalize="none">
   <div id="url"></div>
+</div>
 <script>
   const BASE = 'https://example.com/n/';
   const DRAFT_KEY = 'new-note-draft';
   const p = n => String(n).padStart(2, '0');
-  const noteEl = document.getElementById('note');
-  const titleEl = document.getElementById('title');
-  const urlEl = document.getElementById('url');
-  const msg = document.getElementById('msg');
+  const $ = id => document.getElementById(id);
+  const noteEl = $('note'), titleEl = $('title'), tagsEl = $('tags'), msg = $('msg'), urlEl = $('url');
 
   function makeUrl() {
     const d = new Date();
     return BASE + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
       '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
   }
-
-  // Keep an unsent draft so a thought is never lost if the page closes.
-  function saveDraft() {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ n: noteEl.value, t: titleEl.value })); } catch {}
+  function fields() {
+    return { note: noteEl.value.trim(), title: titleEl.value.trim(), tags: tagsEl.value.trim() };
   }
-  function clearDraft() {
+
+  // Unsent draft survives the page closing.
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ n: noteEl.value, t: titleEl.value, g: tagsEl.value })); } catch {}
+  }
+  function clearAll() {
+    noteEl.value = ''; titleEl.value = ''; tagsEl.value = ''; urlEl.textContent = '';
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
   }
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    if (d) { noteEl.value = d.n || ''; titleEl.value = d.t || ''; }
+    if (d) { noteEl.value = d.n || ''; titleEl.value = d.t || ''; tagsEl.value = d.g || ''; }
   } catch {}
-  noteEl.addEventListener('input', saveDraft);
-  titleEl.addEventListener('input', saveDraft);
+  [noteEl, titleEl, tagsEl].forEach(el => el.addEventListener('input', saveDraft));
   noteEl.focus();
 
-  document.getElementById('go').addEventListener('click', async () => {
+  // Pinboard: opens Pinboard's own save form with everything filled in.
+  // Needs a connection and being logged in to pinboard.in in your browser.
+  $('pinboard').addEventListener('click', () => {
+    const { note, title, tags } = fields();
     const url = makeUrl();
-    const note = noteEl.value.trim();
-    const title = titleEl.value.trim();
+    urlEl.textContent = url;
+    const q = new URLSearchParams({
+      url,
+      title: title || note.split('\n')[0].slice(0, 80) || 'Note',
+      description: note,
+      tags,
+      jump: 'close'
+    });
+    const w = window.open('https://pinboard.in/add?' + q.toString(), '_blank');
+    msg.textContent = w ? 'Opened Pinboard. Check it saved, then tap ✕ to clear.'
+                        : 'Pop-up blocked. Allow pop-ups for this site and try again.';
+  });
+
+  // Pinkt: Android share menu. Works offline; Pinkt syncs later.
+  $('pinkt').addEventListener('click', async () => {
+    const { note, title } = fields();
+    const url = makeUrl();
     urlEl.textContent = url;
     msg.textContent = '';
-
     if (!navigator.share) {
-      try {
-        await navigator.clipboard.writeText(url);
-        msg.textContent = 'Sharing not available here. URL copied — paste it in Pinkt.';
-      } catch {
-        msg.textContent = 'Sharing not available here. Copy the URL below into Pinkt.';
-      }
+      try { await navigator.clipboard.writeText(url); msg.textContent = 'Sharing not available. URL copied for Pinkt.'; }
+      catch { msg.textContent = 'Sharing not available. Copy the URL below into Pinkt.'; }
       return;
     }
-
     const data = { url };
     if (title) data.title = title;
     if (note) data.text = note;
-
-    // Share first (it needs the fresh tap), then copy the note as a backup.
     const sharing = navigator.share(data);
     if (note) navigator.clipboard?.writeText(note).catch(() => {});
     try {
       await sharing;
-      noteEl.value = ''; titleEl.value = ''; clearDraft();
+      clearAll();
       msg.textContent = note ? 'Sent. Note is also on your clipboard if Pinkt left it out.' : 'Sent.';
     } catch (e) {
       if (e.name !== 'AbortError') msg.textContent = 'Share failed: ' + e.message;
-      // Draft is kept so nothing is lost.
     }
   });
+
+  $('clear').addEventListener('click', () => { clearAll(); msg.textContent = ''; noteEl.focus(); });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
