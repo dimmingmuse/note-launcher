@@ -1,9 +1,14 @@
-// Caches the page so the home-screen icon works with no signal.
-const CACHE = 'new-note-v7';
-const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+// Serves the saved copy instantly so the app opens with no signal.
+// The page itself checks for newer files and shows an Update button.
+const CACHE = 'new-note';
+const FILES = ['./', 'index.html', 'manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'no-cache' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
@@ -15,5 +20,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  if (e.request.method !== 'GET') return;
+  // The page's update check must reach GitHub, not this saved copy.
+  if (e.request.headers.get('x-update-check')) return;
+  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request)));
 });

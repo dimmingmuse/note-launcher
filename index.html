@@ -29,6 +29,11 @@
     padding: 14px 18px 6px; color: var(--muted); font-size: 14px;
   }
   header .right { justify-self: end; }
+  button.update {
+    margin: 4px 14px 2px; border: 0; border-radius: 12px; padding: 11px;
+    background: #b7791f; color: #fff; font-size: 15px; font-weight: 600;
+  }
+  button.update[hidden] { display: none; }
   main {
     flex: 1; display: flex; flex-direction: column; min-height: 0;
     margin: 4px 14px 0; background: var(--surface);
@@ -75,6 +80,7 @@
     <button id="inbox" class="small">View temp inbox</button>
     <span class="right"><button id="clear" class="small">Clear</button></span>
   </header>
+  <button id="update" class="update" hidden>Update available — tap to update</button>
 
   <main>
     <textarea id="note" placeholder="What's on your mind?" autofocus></textarea>
@@ -151,10 +157,16 @@
     const data = { url };
     if (title) data.title = title;
     if (note) data.text = note;
+    // Copy the note first (while the page still has focus), so it can be pasted
+    // into Pinkt's description if Pinkt only picks up the URL.
+    let copied = false;
+    if (note && navigator.clipboard) {
+      try { await navigator.clipboard.writeText(note); copied = true; } catch {}
+    }
     try {
       await navigator.share(data);
       clearAll();
-      say('Sent to Pinkt.');
+      say(copied ? 'Sent to Pinkt. Note copied — paste it into the description if needed.' : 'Sent to Pinkt.');
     } catch (e) {
       if (e.name !== 'AbortError') say('Share failed: ' + e.message);
     }
@@ -174,8 +186,52 @@
 
   $('clear').addEventListener('click', () => { clearAll(); say(''); noteEl.focus(); });
 
+  // ---- Offline copy + update check ----
+  const CACHE = 'new-note';
+  const FILES = ['./', 'index.html', 'manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png'];
+  const CHECK = ['index.html', 'manifest.webmanifest', 'sw.js'];
+  const updateBtn = $('update');
+  let fresh = null;   // newer files fetched during the check
+
+  async function checkForUpdate() {
+    if (!('caches' in window) || !navigator.onLine) return;
+    try {
+      const cache = await caches.open(CACHE);
+      const got = {};
+      let changed = false;
+      for (const f of CHECK) {
+        const net = await fetch(f, { cache: 'no-cache', headers: { 'x-update-check': '1' } });
+        if (!net.ok) return;
+        const saved = await cache.match(f);
+        const netText = await net.clone().text();
+        if (!saved || (await saved.text()) !== netText) changed = true;
+        got[f] = net;
+      }
+      if (changed) { fresh = got; updateBtn.hidden = false; }
+    } catch { /* offline or flaky: try again next open */ }
+  }
+
+  updateBtn.addEventListener('click', async () => {
+    updateBtn.textContent = 'Updating…';
+    try {
+      const cache = await caches.open(CACHE);
+      for (const f of FILES) {
+        const r = (fresh && fresh[f]) || await fetch(f, { cache: 'no-cache', headers: { 'x-update-check': '1' } });
+        if (r.ok) await cache.put(f, r.clone());
+      }
+      const idx = await cache.match('index.html');
+      if (idx) await cache.put('./', idx);
+      const reg = await navigator.serviceWorker?.getRegistration();
+      await reg?.update().catch(() => {});
+    } catch {}
+    location.reload();   // the unsent draft is kept
+  });
+
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(() => navigator.serviceWorker.ready)
+      .then(checkForUpdate)
+      .catch(() => {});
   }
 </script>
 </body>
